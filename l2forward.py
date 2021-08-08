@@ -1,6 +1,6 @@
 from logging import setLoggerClass
 from mininet.topo import Topo
-from mininet.node import OVSSwitch, Switch, Controller, Node
+from mininet.node import OVSSwitch, Switch, Controller, Node, OVSController
 from mininet.link import TCLink
 from mininet.cli import CLI
 from mininet.net import Mininet
@@ -9,7 +9,7 @@ from mininet.log import setLogLevel, info
 import multiprocessing as mp
 from scapy.all import *
 from scapy.layers.l2 import Ether, ARP, ARP_am
-from scapy.layers.inet import UDP, TCP, IP
+from scapy.layers.inet import UDP, TCP, IP, ICMP
 from utils import Config
 import os.path as osp
 
@@ -44,9 +44,9 @@ def int_to_ipv4(addr: int):
 
 
 
-class TofinoVHostTopo(Topo):
+class VHostTopo(Topo):
     def build(self, config):
-        switch = self.addSwitch('s1')
+        switch = self.addSwitch('s1', log_file='s1.log')
         for name, attr in config.hosts.items():
             self.addHost(name=name, ip=attr['ip'])
             self.addLink(name, switch, 
@@ -55,7 +55,7 @@ class TofinoVHostTopo(Topo):
         
 
 
-class TofinoVHostController(Controller):
+class VHostController(OVSController):
     def __init__(self, name, **params):
         super().__init__(name, **params)
         self.processes = []
@@ -64,7 +64,7 @@ class TofinoVHostController(Controller):
     def sniff_and_forward(self, in_iface):
         # whenever receive a package, we check whether it is an `arp`,
         # if it is, then reply with an `arp` reply
-        # otherwise, we can directly send this packet to tofino model switch
+        # otherwise, we can directly send this packet to  model switch
         am = ARP_am()
         def handle_pkt(pkt):
             if ARP in pkt:
@@ -80,26 +80,38 @@ class TofinoVHostController(Controller):
                 sendp(reply, iface=in_iface, verbose=False)
             else:
                 # for now, this is a normal forward logic
-                ether = pkt[Ether]
-                if ether.dst == 'ff:ff:ff:ff:ff:ff':
-                    assert IP in pkt
-                    iface = self.config.ip_to_host[pkt[IP].dst]['sw_iface0_name']
-                else:
-                    iface = self.config.mac_to_host[pkt[Ether].dst]['sw_iface0_name']
-                info(f'try to send to {iface} ({pkt[Ether].dst})')
-                sendp(pkt, iface=iface, verbose=False)
+                try:
+                    ether = pkt[Ether]
+                    # if ether.dst == "aa:00:00:00:00:01":
+                    #     sendp(pkt, iface='s1-eth01', verbose=False)
+                    # else:
+                    #     sendp(pkt, iface='s1-eth02', verbose=False)
+                    if ether.dst == 'ff:ff:ff:ff:ff:ff':
+                        assert IP in pkt
+                        dst_host = self.config.ip_to_host[pkt[IP].dst]
+                        pkt[Ether].dst = dst_host.mac
+                        iface = self.config.ip_to_host[pkt[IP].dst]['sw_iface0_name']
+                    else:
+                        iface = self.config.mac_to_host[pkt[Ether].dst]['sw_iface0_name']
+                    sendp(pkt, iface=iface, verbose=False)
+                except KeyError:
+                    ...
         while True:
             try:
-                sniff(iface=in_iface, count=1, prn=lambda x: handle_pkt(x))
+                sniff(iface=in_iface, filter='inbound', prn=lambda x: handle_pkt(x))
             except:
                 import traceback
-                # traceback.print_exc()
+                traceback.print_exc()
 
     def start(self):
         for name, attr in self.config.hosts.items():
             p = mp.Process(target=self.sniff_and_forward, args=(attr['sw_iface0_name'],))
             p.start()
             self.processes.append(p)
+        self.cmd('arp -s 10.1.0.1 aa:00:00:00:00:01')
+        self.cmd('arp -s 10.1.0.2 aa:00:00:00:00:02')
+        ...
+        # super().start()
 
     def stop(self):
         for p in self.processes:
@@ -108,8 +120,8 @@ class TofinoVHostController(Controller):
 
 if __name__ == '__main__':
     setLogLevel('info')
-    topo = TofinoVHostTopo(config=config)
-    net = Mininet(topo=topo, switch=OVSSwitch, link=TCLink, controller=TofinoVHostController)
+    topo = VHostTopo(config=config)
+    net = Mininet(topo=topo, switch=OVSSwitch, link=TCLink, controller=VHostController)
     net.start()
     CLI(net)
     net.stop()

@@ -12,7 +12,7 @@ class Config:
         self.mac_to_ip = {}
         self.ip_to_host = {}
         self.mac_to_host = {}
-        self.sw_ifaces = []
+        self.sw_iface_names = []
         self.hosts = raw['hosts']
         for name, attr in self.hosts.items():
             host_id = name[1:]
@@ -22,10 +22,11 @@ class Config:
             self.mac_to_ip[mac] = ip
             self.ip_to_host[ip] = attr
             self.mac_to_host[mac] = attr
-            # |h1 - h1-eth0|-- |s01-eth0 - switch - s11-eth0| -- |veth0 - tofino model switch|
+            # |h1 - h1-eth0|-- |s1-eth01 - switch - s1-eth11| -- |veth0 - tofino model switch|
             self.hosts[name]['iface_name'] = f'h{host_id}-eth0'
-            self.hosts[name]['sw_iface0_name'] = f's0{host_id}-eth0'
-            self.hosts[name]['sw_iface1_name'] = f's1{host_id}-eth0'
+            self.hosts[name]['sw_iface0_name'] = f's1-eth0{host_id}'
+            self.hosts[name]['sw_iface1_name'] = f's1-eth1{host_id}'
+            self.sw_iface_names.extend([f's1-eth0{host_id}', f's1-eth1{host_id}'])
         # veths
         self.veths = raw['veths']
         #links
