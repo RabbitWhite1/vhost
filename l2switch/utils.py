@@ -12,7 +12,8 @@ class Config:
         self.mac_to_ip = {}
         self.ip_to_host = {}
         self.mac_to_host = {}
-        self.sw_iface_names = []
+        self.sw_iface0_names = []
+        self.sw_iface1_names = []
         self.hosts = raw['hosts']
         for name, attr in self.hosts.items():
             host_id = name[1:]
@@ -26,7 +27,8 @@ class Config:
             self.hosts[name]['iface_name'] = f'h{host_id}-eth0'
             self.hosts[name]['sw_iface0_name'] = f's1-eth0{host_id}'
             self.hosts[name]['sw_iface1_name'] = f's1-eth1{host_id}'
-            self.sw_iface_names.extend([f's1-eth0{host_id}', f's1-eth1{host_id}'])
+            self.sw_iface0_names.append(f's1-eth0{host_id}')
+            self.sw_iface1_names.append(f's1-eth1{host_id}')
         # veths
         self.veths = raw['veths']
         #links

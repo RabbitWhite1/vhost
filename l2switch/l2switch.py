@@ -68,12 +68,17 @@ class VHostController(OVSController):
         am = ARP_am()
         def handle_pkt(pkt):
             if ARP in pkt:
-                pdst = pkt[ARP].pdst
-                mac = self.config.ip_to_mac[pdst]
-                reply = am.make_reply(pkt)
-                reply[Ether].src = mac
-                reply[ARP].hwsrc = mac
-                sendp(reply, iface=in_iface, verbose=False)
+                # method1: fake a arp reply as we want.
+                # pdst = pkt[ARP].pdst
+                # mac = self.config.ip_to_mac[pdst]
+                # reply = am.make_reply(pkt)
+                # reply[Ether].src = mac
+                # reply[ARP].hwsrc = mac
+                # sendp(reply, iface=in_iface, verbose=False)
+
+                # method2: do normal flooding
+                for sw_iface0_name in self.config.sw_iface0_names:
+                    sendp(pkt, iface=sw_iface0_name, verbose=False)
             else:
                 # for now, this is a normal forward logic
                 try:
