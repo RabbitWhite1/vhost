@@ -68,24 +68,16 @@ class VHostController(OVSController):
         am = ARP_am()
         def handle_pkt(pkt):
             if ARP in pkt:
-                # info('接受时')
-                # pkt.show2()
                 pdst = pkt[ARP].pdst
                 mac = self.config.ip_to_mac[pdst]
                 reply = am.make_reply(pkt)
                 reply[Ether].src = mac
                 reply[ARP].hwsrc = mac
-                # info(f'修改后经由 {in_iface} 发出\n')
-                # reply.show2()
                 sendp(reply, iface=in_iface, verbose=False)
             else:
                 # for now, this is a normal forward logic
                 try:
                     ether = pkt[Ether]
-                    # if ether.dst == "aa:00:00:00:00:01":
-                    #     sendp(pkt, iface='s1-eth01', verbose=False)
-                    # else:
-                    #     sendp(pkt, iface='s1-eth02', verbose=False)
                     if ether.dst == 'ff:ff:ff:ff:ff:ff':
                         assert IP in pkt
                         dst_host = self.config.ip_to_host[pkt[IP].dst]
@@ -108,10 +100,6 @@ class VHostController(OVSController):
             p = mp.Process(target=self.sniff_and_forward, args=(attr['sw_iface0_name'],))
             p.start()
             self.processes.append(p)
-        self.cmd('arp -s 10.1.0.1 aa:00:00:00:00:01')
-        self.cmd('arp -s 10.1.0.2 aa:00:00:00:00:02')
-        ...
-        # super().start()
 
     def stop(self):
         for p in self.processes:
