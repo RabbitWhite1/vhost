@@ -44,7 +44,7 @@ def int_to_ipv4(addr: int):
 
 
 
-class VHostTopo(Topo):
+class L2SwitchTopo(Topo):
     def build(self, config):
         switch = self.addSwitch('s1', log_file='s1.log')
         for name, attr in config.hosts.items():
@@ -55,7 +55,7 @@ class VHostTopo(Topo):
         
 
 
-class VHostController(OVSController):
+class L2SwitchController(OVSController):
     def __init__(self, name, **params):
         super().__init__(name, **params)
         self.processes = []
@@ -113,8 +113,8 @@ class VHostController(OVSController):
 
 if __name__ == '__main__':
     setLogLevel('info')
-    topo = VHostTopo(config=config)
-    net = Mininet(topo=topo, switch=OVSSwitch, link=TCLink, controller=VHostController)
+    topo = L2SwitchTopo(config=config)
+    net = Mininet(topo=topo, switch=OVSSwitch, link=TCLink, controller=L2SwitchController)
     net.start()
     CLI(net)
     net.stop()
