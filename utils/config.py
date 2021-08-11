@@ -1,6 +1,5 @@
 import os.path as osp
 import json
-import re
 
 
 class Config:
