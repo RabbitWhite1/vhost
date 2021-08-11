@@ -78,10 +78,12 @@ class VHostController(OVSController):
                 traceback.print_exc()
 
     def start(self):
+        # sniff on sw_ifaces
         for iface in self.config.sw_iface_names:
             p = mp.Process(target=self.sniff_and_forward, args=(iface,))
             p.start()
             self.processes.append(p)
+        # sniff on veths
         for iface in self.config.veths:
             p = mp.Process(target=self.sniff_and_forward, args=(iface,))
             p.start()
@@ -89,7 +91,7 @@ class VHostController(OVSController):
 
     def stop(self):
         for p in self.processes:
-            p.join()
+            p.terminate()
 
 
 if __name__ == '__main__':
