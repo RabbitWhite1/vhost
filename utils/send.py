@@ -35,6 +35,10 @@ def main():
         dst = "aa:00:00:00:00:01"
     elif str(addr) == "10.1.0.2":
         dst = "aa:00:00:00:00:02"
+    elif str(addr) == "10.1.0.3":
+        dst = "aa:00:00:00:00:03"
+    elif str(addr) == "10.1.0.4":
+        dst = "aa:00:00:00:00:04"
     else:
         dst = "ff:ff:ff:ff:ff:ff"
     pkt =  Ether(src=get_if_hwaddr(iface), dst=dst)

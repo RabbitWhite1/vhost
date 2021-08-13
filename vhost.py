@@ -38,9 +38,14 @@ class VHostController(OVSController):
     def sniff_and_forward(self, in_iface):
         def handle_pkt(pkt):
             try:
-                out_iface = self.config.map_iface(in_iface)
-                sendp(pkt, iface=out_iface, verbose=False)
-                info(f'forward a pkt from {in_iface} to {out_iface}')
+                if Ether in pkt and pkt[Ether].dst == 'ff:ff:ff:ff:ff:ff':
+                    # broadcast (recognized by ether dst addr)
+                    for iface in self.config.sw_iface_names:
+                        sendp(pkt, iface=iface, verbose=False)
+                else:
+                    out_iface = self.config.map_iface(in_iface)
+                    sendp(pkt, iface=out_iface, verbose=False)
+                    print(f'{in_iface} --> {out_iface}')
             except KeyError:
                 ...
         while True:

@@ -35,6 +35,8 @@ class Config:
             self.veth_to_sw_iface[veth] = sw_iface_name
             self.veths.append(veth)
             self.sw_iface_to_veth[sw_iface_name] = veth
+        # controller
+        self.controller = raw['controller']
 
     def map_iface(self, iface: str) -> str:
         if iface[0] == 'v':
