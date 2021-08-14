@@ -52,7 +52,7 @@ class VHostController(OVSController):
                 else:
                     out_iface = self.config.map_iface(in_iface)
                     sendp(pkt, iface=out_iface, verbose=False)
-                    print(f'{in_iface} --> {out_iface}')
+                    print(f'{in_iface} --> {out_iface}: {pkt.summary()}')
             except KeyError:
                 ...
         while True:
@@ -85,13 +85,48 @@ class VHostNet(Mininet):
         self.config=config
 
     def setup_host_alias(self):
-        ...
+        self.origin_hosts = open('/etc/hosts').read()
+        new_hosts = []
+        for host in self.hosts: 
+            new_hosts.append(f'{host.IP()} {host.name}')
+        new_hosts = '\n'.join(new_hosts)
+        print('=============== Origin Hosts ===============')
+        print(self.origin_hosts)
+        print('=============== New Hosts ===============')
+        print(new_hosts)
+        for host in self.hosts:
+            host.cmd(f'echo "{self.origin_hosts + new_hosts}" > /etc/hosts')
+
+
+    def teardown_host_alias(self):
+        for host in self.hosts:
+            host.cmd(f'echo "{self.origin_hosts}" > /etc/hosts')
 
     def setup_arp(self):
         ...
+    
+    def teardown_arp(self):
+        ...
 
     def setup_ssh(self):
-        ...
+        for host in self.hosts:
+            host.cmd('/usr/sbin/sshd')
+
+    def teardown_ssh(self):
+        for host in self.hosts:
+            host.cmd('pkill sshd')
+
+    def start(self):
+        super().start()
+        self.setup_host_alias()
+        self.setup_arp()
+        self.setup_ssh()
+
+    def stop(self):
+        self.teardown_ssh()
+        self.teardown_arp()
+        self.teardown_host_alias()
+        super().stop()
 
 if __name__ == '__main__':
     setLogLevel('info')
