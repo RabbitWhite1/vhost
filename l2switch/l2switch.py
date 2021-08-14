@@ -82,14 +82,7 @@ class L2SwitchController(OVSController):
             else:
                 # for now, this is a normal forward logic
                 try:
-                    ether = pkt[Ether]
-                    if ether.dst == 'ff:ff:ff:ff:ff:ff':
-                        assert IP in pkt
-                        dst_host = self.config.ip_to_host[pkt[IP].dst]
-                        pkt[Ether].dst = dst_host.mac
-                        iface = self.config.ip_to_host[pkt[IP].dst]['sw_iface0_name']
-                    else:
-                        iface = self.config.mac_to_host[pkt[Ether].dst]['sw_iface0_name']
+                    iface = self.config.mac_to_host[pkt[Ether].dst]['sw_iface0_name']
                     sendp(pkt, iface=iface, verbose=False)
                 except KeyError:
                     ...
@@ -108,7 +101,7 @@ class L2SwitchController(OVSController):
 
     def stop(self):
         for p in self.processes:
-            p.join()
+            p.terminate()
 
 
 if __name__ == '__main__':
