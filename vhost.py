@@ -25,7 +25,8 @@ class VHostTopo(Topo):
             self.addHost(name=name, ip=attr['ip'])
             self.addLink(name, switch, 
                          addr1=attr['mac'], addr2=attr['sw_mac'],
-                         intfName1=attr['host_iface_name'], intfName2=attr['sw_iface_name'])
+                         intfName1=attr['host_iface_name'], intfName2=attr['sw_iface_name'],
+                         bw=10, delay='5ms')
                          
         
 class VHostController(OVSController):
@@ -38,6 +39,12 @@ class VHostController(OVSController):
     def sniff_and_forward(self, in_iface):
         def handle_pkt(pkt):
             try:
+                if IP in pkt:
+                    del pkt[IP].chksum
+                if TCP in pkt:
+                    del pkt[TCP].chksum
+                if UDP in pkt:
+                    del pkt[UDP].chksum
                 if Ether in pkt and pkt[Ether].dst == 'ff:ff:ff:ff:ff:ff':
                     # broadcast (recognized by ether dst addr)
                     for iface in self.config.sw_iface_names:
@@ -72,10 +79,24 @@ class VHostController(OVSController):
             p.terminate()
 
 
+class VHostNet(Mininet):
+    def __init__(self, config, topo, switch=OVSSwitch, link=TCLink, controller=VHostController, **kwargs):
+        super(VHostNet, self).__init__(topo=topo, switch=OVSSwitch, link=TCLink, controller=VHostController, **kwargs)
+        self.config=config
+
+    def setup_host_alias(self):
+        ...
+
+    def setup_arp(self):
+        ...
+
+    def setup_ssh(self):
+        ...
+
 if __name__ == '__main__':
     setLogLevel('info')
     topo = VHostTopo(config=config)
-    net = Mininet(topo=topo, switch=OVSSwitch, link=TCLink, controller=VHostController)
+    net = VHostNet(config=config, topo=topo, switch=OVSSwitch, link=TCLink, controller=VHostController)
     net.start()
     CLI(net)
     net.stop()

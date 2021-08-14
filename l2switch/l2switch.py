@@ -67,6 +67,12 @@ class L2SwitchController(OVSController):
         # otherwise, we can directly send this packet to  model switch
         am = ARP_am()
         def handle_pkt(pkt):
+            if IP in pkt:
+                del pkt[IP].chksum
+            if TCP in pkt:
+                del pkt[TCP].chksum
+            if UDP in pkt:
+                del pkt[UDP].chksum
             if ARP in pkt:
                 # method1: fake a arp reply as we want.
                 # pdst = pkt[ARP].pdst
