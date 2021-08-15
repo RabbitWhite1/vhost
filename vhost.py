@@ -1,7 +1,7 @@
 from logging import setLoggerClass
 from mininet.topo import Topo
 from mininet.node import OVSSwitch, Switch, Controller, Node, OVSController
-from mininet.link import TCLink
+from mininet.link import TCLink, OVSLink
 from mininet.cli import CLI
 from mininet.net import Mininet
 from mininet.util import dumpNodeConnections
@@ -25,8 +25,7 @@ class VHostTopo(Topo):
             self.addHost(name=name, ip=attr['ip'])
             self.addLink(name, switch, 
                          addr1=attr['mac'], addr2=attr['sw_mac'],
-                         intfName1=attr['host_iface_name'], intfName2=attr['sw_iface_name'],
-                         bw=10, delay='5ms')
+                         intfName1=attr['host_iface_name'], intfName2=attr['sw_iface_name'])
                          
         
 class VHostController(OVSController):
@@ -80,8 +79,8 @@ class VHostController(OVSController):
 
 
 class VHostNet(Mininet):
-    def __init__(self, config, topo, switch=OVSSwitch, link=TCLink, controller=VHostController, **kwargs):
-        super(VHostNet, self).__init__(topo=topo, switch=OVSSwitch, link=TCLink, controller=VHostController, **kwargs)
+    def __init__(self, config, topo, switch=OVSSwitch, link=OVSLink, controller=VHostController, **kwargs):
+        super(VHostNet, self).__init__(topo=topo, switch=switch, link=link, controller=controller, **kwargs)
         self.config=config
 
     def setup_host_alias(self):
@@ -110,6 +109,7 @@ class VHostNet(Mininet):
 
     def setup_ssh(self):
         for host in self.hosts:
+            host.cmd('mkdir -p /run/sshd')
             host.cmd('/usr/sbin/sshd')
 
     def teardown_ssh(self):
@@ -128,10 +128,15 @@ class VHostNet(Mininet):
         self.teardown_host_alias()
         super().stop()
 
-if __name__ == '__main__':
+
+def main():
     setLogLevel('info')
     topo = VHostTopo(config=config)
     net = VHostNet(config=config, topo=topo, switch=OVSSwitch, link=TCLink, controller=VHostController)
     net.start()
     CLI(net)
     net.stop()
+
+
+if __name__ == '__main__':
+    main()
