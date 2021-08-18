@@ -4,10 +4,6 @@
 
 This project aims to provide virtual hosts for testing Barefoot Tofino Switches running on the Tofino Model.
 
-## l2switch
-
-Files in `l2switch` are to test the feasibility of my idea. I will later build the real virtual hosts for the target mentioned above.
-
 ## VHost
 
 Run `vhost.py` will create hosts according to `config.json`, whose format is as following:
@@ -45,3 +41,7 @@ With this configuration, `vhost` will do as following.
     - when a packet is received from `veth1`, it will be forwarded to `s1-eth1`
     - when a packet is received from `s1-eth1`, it will be forwarded to `veth1`
     - if the `dst` of `packet[Ether]` is `ff:ff:ff:ff:ff:ff`, for now, I broadcast this packet.
+
+## l2switch
+
+Files in `l2switch` are to test the feasibility of my idea. I will later build the real virtual hosts for the target mentioned above.
