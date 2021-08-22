@@ -4,6 +4,15 @@
 
 This project aims to provide virtual hosts for testing Barefoot Tofino Switches running on the Tofino Model.
 
+## Requirements
+
+- packages:
+```shell
+sudo apt-get install mininet openssh-client openssh-server
+pip3 install mininet
+```
+
+
 ## VHost
 
 Run `vhost.py` will create hosts according to `config.json`, whose format is as following:
