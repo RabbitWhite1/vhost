@@ -8,7 +8,8 @@ This project aims to provide virtual hosts for testing Barefoot Tofino Switches 
 
 - packages:
 ```shell
-sudo apt-get install mininet openssh-client openssh-server
+sudo apt-get install mininet openssh-client openssh-server openvswitch-testcontroller
+sudo ln /usr/bin/ovs-testcontroller /usr/bin/controller 
 pip3 install mininet
 ```
 
