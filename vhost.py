@@ -12,6 +12,7 @@ from scapy.layers.l2 import Ether, ARP, ARP_am
 from scapy.layers.inet import UDP, TCP, IP, ICMP
 from utils import Config
 import os.path as osp
+import traceback
 
 
 config_path = osp.join(osp.dirname(__file__), 'config.json')
@@ -34,7 +35,7 @@ class VHostController(OVSController):
         self.processes = []
         self.config = Config(config_path)
 
-    def reply_if_ctrl_arp(self, pkt, in_iface):
+    def reply_if_to_ctrl_arp(self, pkt, in_iface):
         am = ARP_am()
         ctrl_config = self.config.controller
         if ARP in pkt:
@@ -44,18 +45,18 @@ class VHostController(OVSController):
                 reply[Ether].src = mac
                 reply[ARP].hwsrc = mac
                 sendp(reply, iface=in_iface, verbose=False)
-                print(f'--> {in_iface}: {reply.summary()}')
+                print(f'\033[1;33mARP\033[0m \033[1;34m--> {in_iface}\033[0m: {list(reply)}')
                 return True
         return False
 
-    def reply_if_ctrl_msg(self, pkt, in_iface):
+    def forward_if_to_ctrl_msg(self, pkt, in_iface):
         ctrl_config = self.config.controller
         if IP in pkt and UDP in pkt:
             print(f"{ctrl_config['ip']} == {pkt[IP].dst} and {ctrl_config['port']} == {pkt[UDP].dport}: {ctrl_config['ip'] == pkt[IP].dst and ctrl_config['port'] == pkt[UDP].dport}")
-            if ctrl_config['ip'] == pkt[IP].dst and ctrl_config['port'] == pkt[UDP].dport:
+            if in_iface == ctrl_config['veth'] or (ctrl_config['ip'] == pkt[IP].dst and ctrl_config['port'] == pkt[UDP].dport):
                 out_iface = ctrl_config["sw_iface_name"]
-                sendp(pkt, iface=in_iface, verbose=False)
-                print(f'{in_iface} --> {out_iface}: {pkt.summary()}')
+                sendp(pkt, iface=out_iface, verbose=False)
+                print(f'\033[1;33mCtrl forward\033[0m \033[1;34m{in_iface} --> {out_iface}\033[0m : {list(pkt)}')
                 return True
         return False
     
@@ -67,23 +68,26 @@ class VHostController(OVSController):
                 del pkt[TCP].chksum
             if UDP in pkt:
                 del pkt[UDP].chksum
-            if Ether in pkt and pkt[Ether].dst == 'ff:ff:ff:ff:ff:ff':
-                # if control arp
-                if self.reply_if_ctrl_arp(pkt, in_iface):
-                    return
+            # if control arp
+            if self.reply_if_to_ctrl_arp(pkt, in_iface):
+                return
+            # if message to controller
+            if self.forward_if_to_ctrl_msg(pkt, in_iface):
+                return
+            # other messages
+            if Ether in pkt and pkt[Ether].dst == 'ff:ff:ff:ff:ff:ff' and in_iface != self.config.controller['veth']:
                 # broadcast (recognized by ether dst addr)
                 for iface in self.config.sw_iface_names:
                     if iface == in_iface:
                         continue
                     sendp(pkt, iface=iface, verbose=False)
-                    print(f'{in_iface} --> {iface}: {pkt.summary()}')
+                    print(f'\033[1;33mBroadcast\033[0m \033[1;34m{in_iface} --> {iface}\033[0m: {list(pkt)}')
+                return
             else:
-                # if control message
-                if self.reply_if_ctrl_msg(pkt, in_iface):
-                    return
                 out_iface = self.config.map_iface(in_iface)
                 sendp(pkt, iface=out_iface, verbose=False)
-                print(f'{in_iface} --> {out_iface}: {pkt.summary()}')
+                print(f'\033[1;33mForward\033[0m \033[1;34m{in_iface} --> {out_iface}\033[0m: {list(pkt)}')
+                return
         except KeyError:
             ...
 
@@ -92,7 +96,6 @@ class VHostController(OVSController):
             try:
                 sniff(iface=in_iface, filter='inbound', prn=lambda x: self.handle_pkt(x, in_iface))
             except:
-                import traceback
                 traceback.print_exc()
 
     def start(self):
@@ -123,20 +126,15 @@ class VHostNet(Mininet):
         for host in self.hosts: 
             new_hosts.append(f'{host.IP()} {host.name}')
         new_hosts.append(f'192.168.195.140 ctrl')
-        new_hosts = '\n'.join(new_hosts)
+        new_hosts = '\n'.join(new_hosts) + '\n'
         print('=============== Origin Hosts ===============')
         print(self.origin_hosts)
         print('=============== New Hosts ===============')
         print(new_hosts)
-        for host in self.hosts:
-            host.cmd(f'echo "{self.origin_hosts + new_hosts}" > /etc/hosts')
-            break
-
+        self.hosts[0].cmd(f'echo -n "{self.origin_hosts + new_hosts}" > /etc/hosts')
 
     def teardown_host_alias(self):
-        for host in self.hosts:
-            host.cmd(f'echo "{self.origin_hosts}" > /etc/hosts')
-            break
+        self.hosts[0].cmd(f'echo -n "{self.origin_hosts}" > /etc/hosts')
 
     def setup_arp(self):
         ...

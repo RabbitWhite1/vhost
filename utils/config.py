@@ -45,6 +45,9 @@ class Config:
         self.controller_name = raw['controller']['name']
         self.controller = raw['controller']
         self.controller['port'] = int(self.controller['port'])
+        veth = self.controller['veth']
+        self.veths.append(veth)
+        self.veth_to_sw_iface[veth] = self.controller['sw_iface_name']
         # veth = self.controller['veth']
         # host_iface_name = self.controller['host_iface_name']
         # sw_iface_name = self.controller['sw_iface_name']
