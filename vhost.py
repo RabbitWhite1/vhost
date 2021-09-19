@@ -49,16 +49,44 @@ class VHostController(OVSController):
                 return True
         return False
 
-    def forward_if_to_ctrl_msg(self, pkt, in_iface):
+    def forward_if_from_ctrl_pkt(self, pkt, in_iface):
         ctrl_config = self.config.controller
-        if IP in pkt and UDP in pkt:
-            print(f"{ctrl_config['ip']} == {pkt[IP].dst} and {ctrl_config['port']} == {pkt[UDP].dport}: {ctrl_config['ip'] == pkt[IP].dst and ctrl_config['port'] == pkt[UDP].dport}")
-            if in_iface == ctrl_config['veth'] or (ctrl_config['ip'] == pkt[IP].dst and ctrl_config['port'] == pkt[UDP].dport):
-                out_iface = ctrl_config["sw_iface_name"]
+        if IP in pkt:
+            print(f'\033[1;31mFrom Ctrl forward\033[0m \033[1;34m{pkt[IP].src} --> {pkt[IP].dst}\033[0m : {list(pkt)}')
+        if in_iface == ctrl_config['sw_iface_name']:
+            # from ctrl
+            out_iface = None
+            if Ether in pkt and pkt[Ether].dst in self.config.macs:
+                # to virtual hosts
+                out_iface = self.config.mac_to_host[pkt[Ether].dst]['sw_iface_name']
+            if IP in pkt and pkt[IP].dst in self.config.ips:
+                dst_host = self.config.ip_to_host[pkt[IP].dst]
+                out_iface = dst_host['sw_iface_name']
+                pkt[Ether].dst = dst_host['mac']                
+            if out_iface:
+                if IP in pkt:
+                    del pkt[IP].chksum
+                if TCP in pkt:
+                    del pkt[TCP].chksum
+                if UDP in pkt:
+                    del pkt[UDP].chksum
                 sendp(pkt, iface=out_iface, verbose=False)
-                print(f'\033[1;33mCtrl forward\033[0m \033[1;34m{in_iface} --> {out_iface}\033[0m : {list(pkt)}')
-                return True
-        return False
+                print(f'\033[1;31mFrom Ctrl forward\033[0m \033[1;34m{in_iface} --> {out_iface}\033[0m : {list(pkt)}')
+            
+    def handle_to_ctrl_pkt(self, pkt, in_iface):
+        try:
+            if IP in pkt:
+                del pkt[IP].chksum
+            if TCP in pkt:
+                del pkt[TCP].chksum
+            if UDP in pkt:
+                del pkt[UDP].chksum
+            ctrl_config = self.config.controller
+            out_iface = ctrl_config["sw_iface_name"]
+            sendp(pkt, iface=out_iface, verbose=False)
+            print(f'\033[1;31mTo Ctrl\033[0m \033[1;34m{in_iface} --> {out_iface}\033[0m : {list(pkt)}')
+        except:
+            traceback.print_exc()
     
     def handle_pkt(self, pkt, in_iface):
         try:
@@ -71,9 +99,6 @@ class VHostController(OVSController):
             # if control arp
             if self.reply_if_to_ctrl_arp(pkt, in_iface):
                 return
-            # if message to controller
-            if self.forward_if_to_ctrl_msg(pkt, in_iface):
-                return
             # other messages
             if Ether in pkt and pkt[Ether].dst == 'ff:ff:ff:ff:ff:ff' and in_iface != self.config.controller['veth']:
                 # broadcast (recognized by ether dst addr)
@@ -81,34 +106,47 @@ class VHostController(OVSController):
                     if iface == in_iface:
                         continue
                     sendp(pkt, iface=iface, verbose=False)
-                    print(f'\033[1;33mBroadcast\033[0m \033[1;34m{in_iface} --> {iface}\033[0m: {list(pkt)}')
+                    print(f'\033[1;35mBroadcast\033[0m \033[1;34m{in_iface} --> {iface}\033[0m: {list(pkt)}')
                 return
             else:
                 out_iface = self.config.map_iface(in_iface)
                 sendp(pkt, iface=out_iface, verbose=False)
-                print(f'\033[1;33mForward\033[0m \033[1;34m{in_iface} --> {out_iface}\033[0m: {list(pkt)}')
+                print(f'\033[1;32mForward\033[0m \033[1;34m{in_iface} --> {out_iface}\033[0m: {list(pkt)}')
                 return
         except KeyError:
             ...
 
-    def sniff_and_forward(self, in_iface):
+    def sniff_loop(self, in_iface, handler, filter='inbound'):
+        print(f'sniff on {in_iface}')
         while True:
             try:
-                sniff(iface=in_iface, filter='inbound', prn=lambda x: self.handle_pkt(x, in_iface))
+                sniff(iface=in_iface, filter=filter, prn=handler)
             except:
                 traceback.print_exc()
 
     def start(self):
         # sniff on sw_ifaces
         for iface in self.config.sw_iface_names:
-            p = mp.Process(target=self.sniff_and_forward, args=(iface,))
+            p = mp.Process(target=self.sniff_loop, args=(iface, lambda x: self.handle_pkt(x, iface)))
             p.start()
             self.processes.append(p)
         # sniff on veths
         for iface in self.config.veths:
-            p = mp.Process(target=self.sniff_and_forward, args=(iface,))
+            p = mp.Process(target=self.sniff_loop, args=(iface, lambda x: self.handle_pkt(x, iface)))
             p.start()
             self.processes.append(p)
+        # sniff on ctrl sw_iface
+        ctrl_config = self.config.controller
+        ctrl_sw_iface_name = ctrl_config['sw_iface_name']
+        p = mp.Process(target=self.sniff_loop, args=(ctrl_sw_iface_name, lambda x: self.forward_if_from_ctrl_pkt(x, ctrl_sw_iface_name), 'outbound'))
+        # p.start()
+        # self.processes.append(p)
+        # sniff on ctrl veth
+        ctrl_veth = ctrl_config['veth']
+        p = mp.Process(target=self.sniff_loop, args=(ctrl_veth, lambda x: self.handle_to_ctrl_pkt(x, ctrl_veth)))
+        p.start()
+        self.processes.append(p)
+
 
     def stop(self):
         for p in self.processes:
