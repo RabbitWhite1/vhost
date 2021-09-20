@@ -13,6 +13,7 @@ from scapy.layers.inet import UDP, TCP, IP, ICMP
 from utils import Config
 import os.path as osp
 import traceback
+import socket
 
 
 config_path = osp.join(osp.dirname(__file__), 'config.json')
@@ -77,13 +78,19 @@ class VHostController(OVSController):
         try:
             if IP in pkt:
                 del pkt[IP].chksum
-            if TCP in pkt:
-                del pkt[TCP].chksum
             if UDP in pkt:
                 del pkt[UDP].chksum
+            if TCP in pkt:
+                del pkt[TCP].chksum
             ctrl_config = self.config.controller
             out_iface = ctrl_config["sw_iface_name"]
             sendp(pkt, iface=out_iface, verbose=False)
+            if UDP in pkt:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                dst_ip = pkt[IP].dst
+                dst_udp_port = pkt[UDP].dport
+                sock.sendto(pkt[UDP].payload.build(), (dst_ip, dst_udp_port))
+                sock.close()
             print(f'\033[1;31mTo Ctrl\033[0m \033[1;34m{in_iface} --> {out_iface}\033[0m : {list(pkt)}')
         except:
             traceback.print_exc()
@@ -139,8 +146,8 @@ class VHostController(OVSController):
         ctrl_config = self.config.controller
         ctrl_sw_iface_name = ctrl_config['sw_iface_name']
         p = mp.Process(target=self.sniff_loop, args=(ctrl_sw_iface_name, lambda x: self.forward_if_from_ctrl_pkt(x, ctrl_sw_iface_name), 'outbound'))
-        # p.start()
-        # self.processes.append(p)
+        p.start()
+        self.processes.append(p)
         # sniff on ctrl veth
         ctrl_veth = ctrl_config['veth']
         p = mp.Process(target=self.sniff_loop, args=(ctrl_veth, lambda x: self.handle_to_ctrl_pkt(x, ctrl_veth)))
