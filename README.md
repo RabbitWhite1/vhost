@@ -52,6 +52,36 @@ With this configuration, `vhost` will do as following.
     - when a packet is received from `s1-eth1`, it will be forwarded to `veth1`
     - if the `dst` of `packet[Ether]` is `ff:ff:ff:ff:ff:ff`, for now, I broadcast this packet.
 
+```
+---------------+                            +---------------------+
+     Model     |                            |        vhost        |
+     =====     |                            |        =====        |
+               | veth0                veth1 |                     | s1-eth1         h1-eth0
+       Port 0  +----------------------------+---------------------+------------------------+ h1
+               |                            |                     |
+               | veth2                veth3 |                     | s2-eth1         h2-eth0
+       Port 1  +----------------------------+---------------------+------------------------+ h2
+               |                            |                     |
+               | veth4                veth5 |                     | s3-eth1         h3-eth0
+       Port 2  +----------------------------+---------------------+------------------------+ h3
+               |                            |                     |
+            
+     . . .                                          . . .
+
+               | veth16              veth17 |                     | s8-eth1         h8-eth0
+       Port 8  +----------------------------+---------------------+------------------------+ h8
+               |                            |                     |
+     . . .                                          . . .
+
+               | veth250            veth251 |                     | ens33           
+ Port 64 (CPU) +----------------------------+---------------------+------------------------+ controller
+               |                            |                     |
+---------------+                            +---------------------+
+```
+
 ## l2switch
 
 Files in `l2switch` are to test the feasibility of my idea. I will later build the real virtual hosts for the target mentioned above.
+
+r --size 2  --rank 0 --redis-host 10.0.1.1 --redis-port 6379 --prefix 377 --transport udp  send_any
+r --size 2  --rank 1 --redis-host 10.0.1.1 --redis-port 6379 --prefix 377 --transport udp  send_any
