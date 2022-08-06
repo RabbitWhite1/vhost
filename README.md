@@ -79,6 +79,8 @@ With this configuration, `vhost` will do as following.
 ---------------+                            +---------------------+
 ```
 
+https://github.com/secdev/scapy/issues/896
+
 ## l2switch
 
 Files in `l2switch` are to test the feasibility of my idea. I will later build the real virtual hosts for the target mentioned above.

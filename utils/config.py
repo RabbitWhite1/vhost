@@ -32,7 +32,8 @@ class Config:
             self.ip_to_host[ip] = attr
             self.mac_to_host[mac] = attr
             # |h1 - h1-eth0|-- |s1-eth01 - switch - veth0 - tofino model switch|
-            host_iface_name = f'{name}-eth0'
+            # host_iface_name = f'{name}-eth0'
+            host_iface_name = 'ens1f0'
             sw_iface_name = f's1-eth-{name}'
             self.hosts[name]['host_iface_name'] = host_iface_name
             self.hosts[name]['sw_iface_name'] = sw_iface_name

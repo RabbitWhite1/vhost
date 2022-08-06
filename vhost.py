@@ -25,9 +25,11 @@ class VHostTopo(Topo):
         switch = self.addSwitch('s1', log_file='s1.log')
         for name, attr in config.hosts.items():
             self.addHost(name=name, ip=attr['ip'])
+            # bw Mbps, 5ms delay, 0% loss, 10000 packet queue
             self.addLink(name, switch, 
                          addr1=attr['mac'], addr2=attr['sw_mac'],
-                         intfName1=attr['host_iface_name'], intfName2=attr['sw_iface_name'])
+                         intfName1=attr['host_iface_name'], intfName2=attr['sw_iface_name'],
+                         bw=10000, delay='50us', loss=0, max_queue_size=10000)
                          
         
 class VHostController(OVSController):
@@ -101,27 +103,30 @@ class VHostController(OVSController):
                 del pkt[IP].chksum
             if TCP in pkt:
                 del pkt[TCP].chksum
-            if UDP in pkt:
-                del pkt[UDP].chksum
+            # if UDP in pkt:
+            #     del pkt[UDP].chksum
             # if control arp
             if self.reply_if_to_ctrl_arp(pkt, in_iface):
                 return
             # other messages
-            if Ether in pkt and pkt[Ether].dst == 'ff:ff:ff:ff:ff:ff' and in_iface != self.config.controller['veth']:
+            if False and Ether in pkt and pkt[Ether].dst == 'ff:ff:ff:ff:ff:ff' and in_iface != self.config.controller['veth']:
                 # broadcast (recognized by ether dst addr)
                 for iface in self.config.sw_iface_names:
                     if iface == in_iface:
                         continue
                     sendp(pkt, iface=iface, verbose=False)
-                    print(f'\033[1;35mBroadcast\033[0m \033[1;34m{in_iface} --> {iface}\033[0m: {list(pkt)}')
+                    print(f'\033[1;35mBroadcast\033[0m ({len(pkt)=}) \033[1;34m{in_iface} --> {iface}\033[0m: {list(pkt)}')
                 return
             else:
                 out_iface = self.config.map_iface(in_iface)
                 sendp(pkt, iface=out_iface, verbose=False)
-                print(f'\033[1;32mForward\033[0m \033[1;34m{in_iface} --> {out_iface}\033[0m: {list(pkt)}')
+                print(f'\033[1;32mForward \033[0m ({len(pkt)=}) \033[1;34m{in_iface} --> {out_iface}\033[0m: {list(pkt)}')
                 return
         except KeyError:
             ...
+        except OSError:
+            traceback.print_exc()
+            print(f'pkt too long: {len(pkt)=}')
 
     def sniff_loop(self, in_iface, handler, filter='inbound'):
         print(f'sniff on {in_iface}')
@@ -182,7 +187,10 @@ class VHostNet(Mininet):
         self.hosts[0].cmd(f'echo -n "{self.origin_hosts}" > /etc/hosts')
 
     def setup_arp(self):
-        ...
+        for i, host_i in enumerate(self.hosts):
+            for j, host_j in enumerate(self.hosts):
+                host_j_config = self.config.hosts[host_j.name]
+                host_i.cmd(f"arp -i {host_j_config['host_iface_name']} -s {host_j_config['ip']} {host_j_config['mac']}")
     
     def teardown_arp(self):
         ...
